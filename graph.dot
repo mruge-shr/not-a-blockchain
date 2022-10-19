@@ -1,0 +1,8 @@
+digraph mygraph {
+    id_597db3f70ff04401bf077435489dcfa7
+    id_2055952b6f62465686101ff191be3dca
+    id_ff9ab9fa43344c55bc88e13abebf7448
+    id_597db3f70ff04401bf077435489dcfa7 -> id_2055952b6f62465686101ff191be3dca [label="cf00bf270cab445d933fb173faf6c8b1"]
+    id_2055952b6f62465686101ff191be3dca -> id_2055952b6f62465686101ff191be3dca [label="{'url': 'mygitrepo/tag', 'sha': 'AAABBBCCCDDD'}"]
+    id_ff9ab9fa43344c55bc88e13abebf7448 -> id_2055952b6f62465686101ff191be3dca [label="4d3f1390d9b241b7a9829aea2d165bc4"]
+}

@@ -1,0 +1,9 @@
+digraph graphdb {
+    {%- for node in nodes %}
+    id_{{node}}
+    {%- endfor %}
+
+    {%- for edge in edges %}
+    id_{{edge[0]}} -> id_{{edge[1]}} [label="{{edge[2]}}"]
+    {%- endfor %}
+}

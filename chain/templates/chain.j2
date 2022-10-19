@@ -1,0 +1,5 @@
+digraph chain {
+    {%- for edge in edges %}
+    id_{{edge[0]}} -> id_{{edge[1]}}
+    {%- endfor %}
+}
