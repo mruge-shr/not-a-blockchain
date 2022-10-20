@@ -2,18 +2,8 @@ from jinja2 import Template
 from os.path import dirname, join
 
 def get_nodes_and_edges(chain):
-    nodes = []
-    edges = []
-    block = chain.head
-    while block:
-        for t in block.transactions:
-            a = t.actor
-            b = t.target
-            c = t.action
-            if a not in nodes: nodes += [a]
-            if b not in nodes: nodes += [b]
-            if (a,b,c) not in edges: edges += [(a,b,c)]
-        block = block.prev
+    nodes = chain.objects.keys()
+    edges = chain.relations
     return nodes, edges
 
 
@@ -42,9 +32,9 @@ def output_cytograph(chain):
     nodes, edges = get_nodes_and_edges(chain)
     elements = []
     for node in nodes:
-        elements  += [{'data': {'id': node, 'label': node}}]
+        elements  += [{'data': {'id': node, 'label': chain.get_name(node)}}]
     for edge in edges:
-        elements  += [{'data': {'source': edge[0], 'target': edge[1]}}]
+        elements  += [{'data': {'source': edge[0], 'target': edge[1], 'label': chain.get_name(edge[2])}}]
     return elements
 
 def output_cytochain(chain):
@@ -55,11 +45,10 @@ def output_cytochain(chain):
     while block:
         if block.id not in done:
             done += [block.id]
-            nodes  += [{'data': {'id': block.id, 'label': block.id}}]
+            nodes  += [{'data': {'id': block.id, 'label': block.id[:6]}}]
         if block.prev:
             edges += [{'data': {'source': block.id, 'target': block.prev.id}}]
         block = block.prev
-    print(nodes+edges)
     return nodes+edges
 
 def output(obj, mode='chain', filename=None):

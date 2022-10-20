@@ -11,3 +11,7 @@ class User(Node):
 class Asset(Node):
     def __init__(self):
         super().__init__()
+
+class Action(Node):
+    def __init__(self):
+        super().__init__()
