@@ -1,5 +1,6 @@
 
 # importing required libraries
+from uuid import uuid4
 import dash
 from dash import dcc, html, Input, Output, State
 
@@ -49,6 +50,20 @@ def new_trans_modal():
             id="new-trans-modal",
             is_open=False,
         )
+def load_save_modal():
+    return dbc.Modal(
+            [
+                dbc.ModalHeader(dbc.ModalTitle("YAML")),
+                dbc.ModalBody(
+                    html.Div([
+                        dbc.Textarea(id='output-text'),
+                        dbc.Button("Save", id="load-yaml", color="primary")
+                    ])
+                )
+            ],
+            id="load-save-modal",
+            is_open=False,
+        )
 
 def new_user_modal():
     return dbc.Modal(
@@ -59,7 +74,7 @@ def new_user_modal():
                     html.Div([
                         dbc.Label("Name", html_for="new-user"),
                         dbc.Input(type="name", id="friendly-name", placeholder="Enter Friendly Name"),
-                        dbc.Button("Create", id="create-user-button", color="primary")
+                        dbc.Button("Create", id="create-obj-button", color="primary")
                     ])
                 ),
             ],
@@ -86,17 +101,28 @@ def open_trans_modal(button, is_open):
         return not is_open
     return is_open
 
+@app.callback(
+    Output("load-save-modal", "is_open"),
+    [Input("save-load-button", "n_clicks")],
+    [State("load-save-modal", "is_open")]
+)
+def open_save_modal(button, is_open):
+    if button:
+        return not is_open
+    return is_open
 
 @app.callback(
     [
         Output("memory", "data"),
         Output("graphs", "children"),
         Output("new-trans-div", "children"),
+        Output("output-text", "value")
     ],
     [
         Input("create-trans-button", "n_clicks"),
-        Input("create-user-button", "n_clicks"),
-        Input("publish-pending","n_clicks")
+        Input("create-obj-button", "n_clicks"),
+        Input("publish-pending","n_clicks"),
+        Input("load-yaml","n_clicks"),
     ],
     [
         State("trans_from", "value"),
@@ -104,10 +130,24 @@ def open_trans_modal(button, is_open):
         State("trans_rel", "value"),
         State("friendly-name", "value"),
         State("object-type", "value"),
+        State("output-text", "value"),
         State("memory", 'data')
     ]
 )
-def create_trans_form(trans_button, user_button, publish_button, frm, to, rel, name, objtype, data):
+def create_trans_form(
+    trans_button, 
+    user_button, 
+    publish_button, 
+    load_button, 
+    frm, 
+    to, 
+    rel, 
+    name, 
+    objtype, 
+    loadtext, 
+    data
+    ):
+    global mychain
     data = data or []
 
     ctx = dash.callback_context
@@ -117,13 +157,20 @@ def create_trans_form(trans_button, user_button, publish_button, frm, to, rel, n
         button_id = ctx.triggered[0]['prop_id'].split('.')[0]
     if button_id == 'create-trans-button':
         data += [(frm, to, rel)]
-    elif button_id == 'create-user-button':
-        new_user = Node()
-        data += [(new_user.id, new_user.id, {'name': name,'type':objtype})]
+    elif button_id == 'create-obj-button':
+        uid = uuid4().hex
+        data += [(uid, uid, {'name': name,'type':objtype})]
     elif button_id == 'publish-pending':
-        mychain.add_block(data)
+        if data:
+            mychain.add_block(transactions=data)
         data = []
-    return data, draw_graphs(), new_trans_modal()
+    elif button_id == 'load-yaml':
+        txt = loadtext
+        newchain = fromTxt(loadtext)
+        if isinstance(newchain, Chain):
+            mychain = newchain
+        data = []
+    return data, draw_graphs(), new_trans_modal(), toYaml(mychain)
 
 
 @app.callback(
@@ -138,55 +185,34 @@ def update_pending(data):
 
 def draw_graphs():
     return [
-        html.Table([
-            html.Thead(
-                html.Tr(
-                    [html.Td(
-                        html.H3("Graph")
-                    ),
-                    html.Td(
-                        html.H3("Block Chain")
-                    )]
-                )
-            ),
-            html.Tbody(
-                html.Tr([
-                    html.Td(
-                        cyto.Cytoscape(
-                            id='Graph',
-                            elements=output(mychain, mode='cytograph'),
-                            layout={'name': 'breadthfirst'},
-                            # style={'width': '400px', 'height': '500px'},
-                            stylesheet=[
-                            {
-                                'selector': 'node',
-                                'style': {
-                                    'content': 'data(label)'
-                                }
-                            },
-                            {
-                                'selector': 'edge',
-                                'style': {
-                                    'label': 'data(label)'
-                                }
-                            },
-                            ]
-                        ),
-                    style={'width': '50%','border': 'solid'}),
-                    html.Td(
-                        cyto.Cytoscape(
-                            id='Chain',
-                            elements=output(mychain, mode='cytochain'),
-                            layout={'name': 'grid'},
-                            # style={'width': '400px', 'height': '500px'}
-                        ),
-                        style={'width': '50%','border': 'solid'}
-                    )
-                ])
-            )
-        ])
-        
-        
+        dbc.Button("SAVE/LOAD",  id="save-load-button",  color="primary"),
+        cyto.Cytoscape(
+            id='Chain',
+            elements=output(mychain, mode='cytochain'),
+            layout={'name': 'breadthfirst'},
+            style={'width': '1000px', 'height': '400px'},
+        ),
+        cyto.Cytoscape(
+            id='Graph',
+            elements=output(mychain, mode='cytograph'),
+            layout={'name': 'cose'},
+            style={'width': '1000px', 'height': '1000px'},
+            stylesheet=[
+            {
+                'selector': 'node',
+                'style': {
+                    'content': 'data(label)'
+                }
+            },
+            {
+                'selector': 'edge',
+                'style': {
+                    'label': 'data(label)'
+                }
+            },
+            ]
+        ),
+         
     ]
 
   
@@ -199,6 +225,7 @@ app.layout = html.Div([
                 dbc.Button("Add Relation", id="add-trans-button", color="primary")
             ]),
             dcc.Store(id='memory'),
+            
             dbc.Col([
                 dbc.ListGroup(id='pending-transactions',
                     children = []
@@ -206,6 +233,7 @@ app.layout = html.Div([
                 dbc.Button("Publish", id="publish-pending", color="primary")
             ])
         ]),
+        html.Div(load_save_modal(),id='load-save-div'),
         html.Div(new_user_modal(),id='new-user-div'),
         html.Div(new_trans_modal(),id='new-trans-div')
 

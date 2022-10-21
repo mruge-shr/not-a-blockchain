@@ -1,5 +1,6 @@
 from jinja2 import Template
 from os.path import dirname, join
+import yaml, json
 
 def get_nodes_and_edges(chain):
     nodes = chain.objects.keys()
@@ -30,12 +31,9 @@ def output_graph(chain):
 
 def output_cytograph(chain):
     nodes, edges = get_nodes_and_edges(chain)
-    elements = []
-    for node in nodes:
-        elements  += [{'data': {'id': node, 'label': chain.get_name(node)}}]
-    for edge in edges:
-        elements  += [{'data': {'source': edge[0], 'target': edge[1], 'label': chain.get_name(edge[2])}}]
-    return elements
+    nodes = [{'data': {'id': n, 'label': chain.get_name(n)}} for n in nodes]
+    edges = [{'data': {'source': e[0], 'target': e[1], 'label': chain.get_name(e[2])}} for e in edges]
+    return nodes + edges
 
 def output_cytochain(chain):
     done = []
@@ -65,3 +63,32 @@ def output(obj, mode='chain', filename=None):
         with open(filename, 'w') as f:
             f.write(content)
     return content
+
+def toYaml(chain):
+    return yaml.dump(chain.toObj())
+
+def toJson(chain):
+    return json.dumps(chain.toObj())
+
+def fromTxt(txt):
+    from .chain import Chain, Transaction, Block
+    obj = None
+    try:
+        obj = yaml.safe_load(txt)
+    except Exception as e:
+        pass
+    try:
+        obj = json.loads(txt)
+    except Exception as e:
+        pass
+    if obj:
+        newChain = Chain()
+        for b in obj[::-1]:
+            id = b.get('id', None)
+            p = newChain.get_block(b.get('prev', False))
+            ts = [Transaction(t['a'],t['b'],t['c']) for t in b.get('transactions', [])]
+            newChain.add_block(block=Block(id=id, prev=p, transactions=ts))
+        return newChain
+    else:
+        return None
+     

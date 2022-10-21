@@ -1,27 +1,52 @@
+from typing import Iterable
 from uuid import uuid4
 
 class Chain:
-    def __init__(self):
-        self.head = Block()
+    def __init__(self,blank=False):
+        if not blank:
+            self.head = Block()
+        else:
+            self.head = False
 
-    def add_block(self, transactions):
-        new_block = Block()
-        new_block.transactions = [
-            Transaction(*t) for t in transactions
-        ]
-        new_block.prev = self.head 
-        self.head = new_block
-    
-    def print(self):
-        block = self.head 
+    def toObj(self):
+        block = self.head
+        output = []
         while block:
-            print(block)
+            output += [block.toObj()]
+            block = block.prev
+        return output
+
+    def get_block(self, id):
+        block = self.head
+        while block:
+            if block.id == id:
+                return block
             block = block.prev
 
+    def add_block(self, block=None, transactions=[]):
+        if isinstance(block, Block):
+            new_block = block
+        else:
+            trans = []
+            for t in transactions:
+                if isinstance(t, Transaction):
+                    trans += [t]
+                else:
+                    trans += [Transaction(*t)]
+            new_block = Block(transactions=trans)
+            new_block.prev = self.head
+        self.head = new_block
+
+
     def get_metadata(self, id):
-        for (k,v) in self.nodes:
-            if k == id: return v 
-        return {}
+        return self.nodes.get(id, {})
+    
+    def get_id(self, v, k='name'):
+        for id in self.nodes.keys():
+            if self.nodes[id].get(k) == v:
+                return id
+        return None
+
     
     def get_name(self, id):
         meta = self.get_metadata(id)
@@ -30,39 +55,33 @@ class Chain:
     @property
     def nodes(self):
         nodes = {}
-        block = self.head
-        while block:
-            for t in block.transactions:
-                if t.isGenesis and t not in nodes.keys():
-                    nodes[t.a] = t.c
-            block = block.prev
-        return nodes.items()
+        for t in self.transactions:
+            if t.isGenesis:
+                if t.a not in nodes.keys(): nodes[t.a] = {}    
+                nodes[t.a] |= t.c
+        return nodes
 
     @property
     def transactions(self):
-        transactions = []
+        ts = []
         block = self.head
         while block:
             for t in block.transactions:
-                if not t.isGenesis:
-                    transactions += [t]
+                ts += [t]
             block = block.prev   
-        return transactions
+        return ts
 
     @property
     def actions(self):
-        return {k:v for (k,v) in self.nodes if v.get('type',"").lower() == 'action'}
+        return {k:v for (k,v) in self.nodes.items() if v.get('type',"").lower() == 'action'}
 
     @property
     def objects(self):
-        return {k:v for (k,v) in self.nodes if v.get('type',"").lower() != 'action'}
+        return {k:v for (k,v) in self.nodes.items() if v.get('type',"").lower() != 'action'}
     
     @property
     def relations(self):
-        relations = []
-        for t in self.transactions:
-            relations += [(t.a,t.b,t.c)]
-        return relations
+        return [(t.a,t.b,t.c) for t in self.transactions if not t.isGenesis]
 
     @property
     def graph(self):
@@ -81,33 +100,42 @@ class Chain:
         return nodes,edges
 
 class Block:
-    def __init__(self):
-        self.id = uuid4().hex
-        self.prev = False
-        self.transactions = []
+    def __init__(self, prev=False, id=None, transactions=[]):
+        if id is None:
+            id = uuid4().hex
+        self.id = id
+        self.prev = prev
+        self.transactions = transactions
 
     def __str__(self):
         return f"{self.id}, trans: {len(self.transactions)}"
 
+    def toObj(self):
+        if self.prev:
+            prev = self.prev.id 
+        else:
+            prev = False
+        return dict(
+            id=self.id,
+            prev=prev,
+            transactions=[
+                t.toObj()
+                for t in self.transactions]
+        )
+    
+
 class Transaction:
     def __init__(self, actor, target, action):
-        self.actor  = actor
-        self.target = target
-        self.action = action
+        self.a = actor
+        self.b = target
+        self.c = action
 
-    @property
-    def isGenesis(self): return self.actor == self.target 
-    @property
-    def a(self): return self.actor
-    @property
-    def b(self): return self.target
-    @property
-    def c(self): return self.action
-
-class Action:
-    def __init__(self):
-        self.actions = dict(
-            CREATED=uuid4().hex,
-            USED=uuid4().hex,
-            APPROVED=uuid4().hex
+    def toObj(self):
+        return dict(
+            a=self.a,
+            b=self.b,
+            c=self.c
         )
+
+    @property
+    def isGenesis(self): return self.a == self.b 
