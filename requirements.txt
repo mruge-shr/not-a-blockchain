@@ -1,4 +1,4 @@
 dash
 dash-bootstrap-components
 dash-cytoscape
-yaml
+pyyaml
