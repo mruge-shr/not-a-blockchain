@@ -8,13 +8,7 @@ from dash import dcc, html, Input, Output, State
 import dash_cytoscape as cyto
 import dash_bootstrap_components as dbc
 
-from chain import *
-
-users = []
-pending = []
-
-mychain = Chain()
-
+from chain import output, Chain, toYaml, toJson, fromTxt
 
 def get_objects(chain):
     return list(chain.objects.keys())
@@ -24,7 +18,14 @@ def get_relations(chain):
 
 app = dash.Dash(external_stylesheets=[dbc.themes.BOOTSTRAP])
 
-def new_trans_modal():
+def new_trans_modal(mychain):
+    try:
+        objects = [dict(label=mychain.get_name(o), value=o) for o in get_objects(mychain)]
+        relations = [dict(label=mychain.get_name(o), value=o) for o in get_relations(mychain)]
+    except:
+        objects = []
+        relations = []
+
     return dbc.Modal(
             [
                 dbc.ModalHeader(dbc.ModalTitle("New Transaction")),
@@ -32,15 +33,15 @@ def new_trans_modal():
                     html.Div([
                         dcc.Dropdown(
                             id="trans_from",
-                            options=[dict(label=mychain.get_name(o), value=o) for o in get_objects(mychain)],
+                            options=objects,
                         ),
                         dcc.Dropdown(
                             id="trans_rel",
-                            options=[dict(label=mychain.get_name(o), value=o) for o in get_relations(mychain)],
+                            options=relations,
                         ),
                         dcc.Dropdown(
                             id="trans_to",
-                            options=[dict(label=mychain.get_name(o), value=o) for o in get_objects(mychain)],
+                            options=objects,
                         ),
                         
                         dbc.Button("Create", id="create-trans-button", color="primary")
@@ -147,8 +148,9 @@ def create_trans_form(
     loadtext, 
     data
     ):
-    global mychain
-    data = data or []
+    if not data: data={}
+    pending = data.get('pending',[])
+    mychain = fromTxt(data.get('chain', []))
 
     ctx = dash.callback_context
     if not ctx.triggered:
@@ -156,21 +158,23 @@ def create_trans_form(
     else:
         button_id = ctx.triggered[0]['prop_id'].split('.')[0]
     if button_id == 'create-trans-button':
-        data += [(frm, to, rel)]
+        pending += [(frm, to, rel)]
     elif button_id == 'create-obj-button':
         uid = uuid4().hex
-        data += [(uid, uid, {'name': name,'type':objtype})]
+        pending += [(uid, uid, {'name': name,'type':objtype})]
     elif button_id == 'publish-pending':
-        if data:
-            mychain.add_block(transactions=data)
-        data = []
+        if pending:
+            mychain.add_block(transactions=pending)
+        pending = []
     elif button_id == 'load-yaml':
         txt = loadtext
         newchain = fromTxt(loadtext)
         if isinstance(newchain, Chain):
             mychain = newchain
-        data = []
-    return data, draw_graphs(), new_trans_modal(), toYaml(mychain)
+        pending = []
+    data['pending'] = pending
+    data['chain'] = toJson(mychain)
+    return data, draw_graphs(mychain), new_trans_modal(mychain), toYaml(mychain)
 
 
 @app.callback(
@@ -179,20 +183,24 @@ def create_trans_form(
     []
 )
 def update_pending(data):
-    data = data or []
+    data = data.get('pending', [])
     return [dbc.ListGroupItem(f"{t[0]},{t[1]},{t[2]}") for t in data]
 
 
-def draw_graphs():
-    return [
-        dbc.Button("SAVE/LOAD",  id="save-load-button",  color="primary"),
-        cyto.Cytoscape(
+def draw_graphs(mychain):
+    if not mychain:
+        return [html.H1("NO DATA YET")]
+    content = [
+        dbc.Button("SAVE/LOAD",  id="save-load-button",  color="primary")
+    ]
+    if mychain:
+        content += [cyto.Cytoscape(
             id='Chain',
             elements=output(mychain, mode='cytochain'),
             layout={'name': 'breadthfirst'},
             style={'width': '1000px', 'height': '400px'},
-        ),
-        cyto.Cytoscape(
+        )]
+        content += [cyto.Cytoscape(
             id='Graph',
             elements=output(mychain, mode='cytograph'),
             layout={'name': 'cose'},
@@ -211,10 +219,8 @@ def draw_graphs():
                 }
             },
             ]
-        ),
-         
-    ]
-
+        )]
+    return content
   
 app.layout = html.Div([
     html.Div([
@@ -235,11 +241,11 @@ app.layout = html.Div([
         ]),
         html.Div(load_save_modal(),id='load-save-div'),
         html.Div(new_user_modal(),id='new-user-div'),
-        html.Div(new_trans_modal(),id='new-trans-div')
+        html.Div(new_trans_modal(None),id='new-trans-div')
 
     ]),
     html.Div([
-        html.Div(draw_graphs(), id='graphs')
+        html.Div(draw_graphs(None), id='graphs')
         
     ],
     )

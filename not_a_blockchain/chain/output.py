@@ -72,14 +72,14 @@ def toJson(chain):
 
 def fromTxt(txt):
     from .chain import Chain, Transaction, Block
-    obj = None
+    obj = []
     try:
         obj = yaml.safe_load(txt)
     except Exception as e:
-        pass
-    try:
-        obj = json.loads(txt)
-    except Exception as e:
+        try:
+            obj = json.loads(txt)
+        except Exception as e:
+            pass
         pass
     if obj:
         newChain = Chain()
@@ -90,5 +90,5 @@ def fromTxt(txt):
             newChain.add_block(block=Block(id=id, prev=p, transactions=ts))
         return newChain
     else:
-        return None
+        return Chain()
      
