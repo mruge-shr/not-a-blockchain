@@ -55,7 +55,7 @@ def output(obj, mode='chain', filename=None):
     elif mode == 'graph':
         func = output_graph
     elif mode == 'cytochain':
-        func = output_cytochain
+        func =  output_cytochain
     elif mode == 'cytograph':
         func = output_cytograph
     content = func(obj)
